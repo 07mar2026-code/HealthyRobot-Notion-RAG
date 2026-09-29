@@ -10,6 +10,11 @@
   - 使用 OpenAI 產生繁體中文、附資料來源且具健康安全界線的回覆。
   - 使用每位 LINE 使用者獨立的短期對話記憶。
   - 透過 n8n Credential 回覆 LINE，不在程式碼中儲存 token。
+- `workflows/healthyrobot-line-notion-rag-gemini-fallback.mjs`
+  - 先以關鍵字評分選出最相關的 Notion 文章，再讀取實際頁面內文。
+  - Gemini 可用時，將 Notion 內容整理成自然語言回覆。
+  - Gemini credential、額度或呼叫失敗時，改回傳 Notion 原文節錄、文章名稱與網址。
+  - 使用獨立測試 Webhook，不接管正式 `line-health-bot`。
 
 ## n8n 草稿
 
@@ -20,11 +25,18 @@
 
 正式 LINE workflow 目前使用 `line-health-bot`。在完成 Notion 實際讀取、OpenAI 回覆與 LINE 測試之前，不應以第二個 Production Webhook 取代正式設定。
 
+Gemini＋無模型備援版建立後會使用獨立草稿與測試 Webhook `line-health-companion-gemini-fallback-draft`；它與原 OpenAI 草稿並存，不覆寫原始版本。
+
+- Gemini＋備援 workflow：`健康陪跑員｜Gemini＋Notion 無模型備援（未發布草稿）`
+- Workflow ID：`QEUFscAPVtzcKGJ2`
+- 狀態：已建立並驗證，尚未發布。
+
 ## 必要的 n8n Credentials
 
 請在 n8n UI 中建立或選取以下 credential；不要把金鑰寫進本 repo：
 
 - OpenAI：`OpenAI account 2`
+- Google Gemini：`Google Gemini(PaLM) Api account`
 - Notion：`Notion account`
 - LINE Header Auth：`LINE Messaging API｜健康陪跑員`
 
@@ -52,4 +64,13 @@
 - OpenAI credential：已在 n8n UI 改選 `OpenAI account 2`。
 - LINE credential：草稿畫面顯示已選取 `LINE Messaging API｜健康陪跑員`。
 - 實際 Notion 檢索、OpenAI 生成與 LINE 回覆：尚未執行。
+- Gemini 主路徑測試：成功，回覆模式 `gemini-rag`。
+- Gemini 刻意失敗測試：成功切換為 `notion-keyword-fallback`。
+- LINE 節點測試使用 pin data，沒有送出真實訊息。
 
+## Gemini＋無模型備援的行為
+
+1. Notion 連線失敗：流程停止，不傳送未經來源支持的健康內容。
+2. Gemini 正常：回覆模式為 `gemini-rag`。
+3. Gemini credential 缺少、額度不足或呼叫失敗：回覆模式為 `notion-keyword-fallback`。
+4. 備援內容只使用實際讀取的 Notion 文章段落，並保留文章名稱與網址。
